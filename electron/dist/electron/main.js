@@ -17,7 +17,7 @@ var CryptoJS = require("crypto-js");
 var initial_configuration_1 = require("../src/app/core/initial-configuration");
 var node_machine_id_1 = require("node-machine-id");
 var app_updater_1 = require("../src/app/core/app-updater");
-var _a = require('electron'), app = _a.app, BrowserWindow = _a.BrowserWindow, globalShortcut = _a.globalShortcut, Menu = _a.Menu, ipcMain = _a.ipcMain, session = _a.session, dialog = _a.dialog, powerMonitor = _a.powerMonitor, Tray = _a.Tray, getCurrentWindow = _a.getCurrentWindow;
+var _a = require('electron'), app = _a.app, BrowserWindow = _a.BrowserWindow, globalShortcut = _a.globalShortcut, Menu = _a.Menu, ipcMain = _a.ipcMain;
 var url = require('url');
 var fs = require('fs');
 var os = require('os');
@@ -32,7 +32,7 @@ app.disableHardwareAcceleration();
 var windowDefaultConfig = {
     dir: path.join(__dirname, "/../../../dist/leapp-client"),
     browserWindow: {
-        width: 430,
+        width: 514,
         height: 600,
         title: "",
         icon: path.join(__dirname, "assets/images/Leapp.png"),
@@ -124,7 +124,7 @@ var generateMainWindow = function () {
         });
     };
     app.on('activate', function () {
-        if (win === null || win === undefined) {
+        if (win === undefined) {
             createWindow();
         }
         else {
@@ -142,7 +142,10 @@ var generateMainWindow = function () {
     var loginCount = 0;
     app.on('login', function (event, webContents, request, authInfo, callback) {
         try {
-            var workspace = fs.existsSync(workspacePath) ? JSON.parse(CryptoJS.AES.decrypt(fs.readFileSync(workspacePath, { encoding: 'utf-8' }), node_machine_id_1.machineIdSync()).toString(CryptoJS.enc.Utf8)) : undefined;
+            var file = fs.readFileSync(workspacePath, { encoding: 'utf-8' });
+            var decriptedFile = CryptoJS.AES.decrypt(file, node_machine_id_1.machineIdSync());
+            var fileExists = fs.existsSync(workspacePath);
+            var workspace = fileExists ? JSON.parse(decriptedFile).toString(CryptoJS.enc.Utf8) : undefined;
             if (workspace !== undefined && workspace.workspaces[0] !== undefined) {
                 workspace = workspace.workspaces[0];
                 if (workspace.proxyConfiguration !== undefined &&
@@ -184,6 +187,27 @@ var generateMainWindow = function () {
         });
     }
 };
+// Used when people accidentally delete .aws directory when a workspace config is already defined
+// Note is a stupid error but people often do so. As there is already some security code with
+// this one we cover the full range of possibilities
+function fixDirectoriesAndFiles() {
+    try {
+        // .aws directory
+        fs.mkdirSync(os.homedir() + '/.aws');
+    }
+    catch (err) {
+        log.warn('directory aws already exist');
+    }
+    finally {
+        try {
+            // Write credential file
+            fs.writeFileSync(awsCredentialsPath, '');
+        }
+        catch (err) {
+            log.warn('credential file couldn\'t be written');
+        }
+    }
+}
 // Prepare and generate the main window if everything is setupped correctly
 var initWorkspace = function () {
     // Remove unused voices from contextual menu
@@ -218,6 +242,7 @@ var initWorkspace = function () {
     }
     else {
         // Generate the main window
+        fixDirectoriesAndFiles();
         generateMainWindow();
     }
 };

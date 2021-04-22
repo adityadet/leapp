@@ -139,6 +139,12 @@ body {
     color: $charcoal-grey;
     border: 2px solid $charcoal-grey!important;
   }
+  button.small-btn {
+    color: white;
+  }
+  button.small-btn:hover {
+    color: #73E0CF;
+  }
 
   .providers {
     display: inline-block;
@@ -164,7 +170,7 @@ body {
     border: 2px solid $main-color-light;
   }
   .providers.extended {
-    margin-left: 7px;
+    margin-left: 0;
     margin-right: 0;
     padding: 10px;
     height: 42px;
@@ -245,4 +251,72 @@ body {
 @keyframes moving {
   from { left: 0; }
   to { left: -10px; }
+}
+
+.tabs{ position: relative; border-bottom: 1px solid #73E0CF; margin: 20px 0; }
+.tabs .tab {
+  cursor: pointer;
+  padding:10px 20px;
+  margin:0 2px -1px;
+  background:#fff;
+  display:inline-block;
+  color:#909f9d;
+  border-radius: 5px 5px 0 0;
+  border: none;
+  border-bottom: 1px solid #73E0CF;
+}
+
+.panel{
+  animation: fadein .8s;
+}
+@keyframes fadein {
+  from {
+    opacity:0;
+  }
+  to {
+    opacity:1;
+  }
+}
+
+.tabs .tab.active {
+  border-top: 3px solid #73E0CF;
+  border-left: 1px solid #73E0CF;
+  border-right: 1px solid #73E0CF;
+  border-bottom: 1px solid white!important;
+}
+
+.idp-url-wrapper {
+  overflow-x: hidden;
+  overflow-y: scroll;
+  height: 240px;
+  margin-right: -25px;
+}
+
+table {
+  display: block;
+
+  th:last-child label{ margin-right: 17px; }
+  th, td {
+    width: 100px!important;
+    border-bottom: 1px solid #cfd2d3;
+    font-size: 10px;
+
+    button {
+      width: 28px!important;
+      height: 28px!important;
+      padding: 0!important;
+      margin-left: 8px;
+      color: white;
+    }
+    button:hover {
+      color: #73E0CF;
+    }
+  }
+  th:first-child, td:first-child {
+    width: 530px!important;
+    overflow: hidden;
+    word-break: break-all;
+    text-overflow: ellipsis;
+    padding: 10px 5px;
+  }
 }

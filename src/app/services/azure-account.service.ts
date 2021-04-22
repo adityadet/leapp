@@ -21,12 +21,13 @@ export class AzureAccountService extends NativeService {
 
   /**
    * Add a new Azure Account to workspace
-   * @param subscriptionId - the account number
+   * @param subscriptionId - Azure Subscription ID
+   * @param tenantId - Azure Tenant ID
    * @param accountName - the account name
+   * @param region - Azure Location
    */
   addAzureAccountToWorkSpace(subscriptionId: string, tenantId: string, accountName: string, region: string) {
     const workspace = this.configurationService.getDefaultWorkspaceSync();
-    const configuration = this.configurationService.getConfigurationFileSync();
 
     // Verify it not exists
     const test = workspace.sessions.filter(sess => (sess.account as AzureAccount).subscriptionId === subscriptionId);
@@ -43,6 +44,7 @@ export class AzureAccountService extends NativeService {
 
       const session: Session = {
         id: uuidv4(),
+        profile: 'notneed',
         active: false,
         loading: false,
         lastStopDate: new Date().toISOString(),

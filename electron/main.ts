@@ -6,7 +6,7 @@ import {machineIdSync} from 'node-machine-id';
 import {Workspace} from '../src/app/models/workspace';
 import {AppUpdater} from '../src/app/core/app-updater';
 
-const {app, BrowserWindow, globalShortcut, Menu, ipcMain, session, dialog, powerMonitor, Tray, getCurrentWindow } = require('electron');
+const {app, BrowserWindow, globalShortcut, Menu, ipcMain } = require('electron');
 
 const url = require('url');
 const fs = require('fs');
@@ -24,7 +24,7 @@ app.disableHardwareAcceleration();
 const windowDefaultConfig = {
   dir: path.join(__dirname, `/../../../dist/leapp-client`),
   browserWindow: {
-    width: 430,
+    width: 514,
     height: 600,
     title: ``,
     icon: path.join(__dirname, `assets/images/Leapp.png`),
@@ -130,7 +130,7 @@ const generateMainWindow = () => {
   };
 
   app.on('activate', () => {
-    if (win === null || win === undefined) {
+    if (win === undefined) {
       createWindow();
     } else {
       win.show();
@@ -150,7 +150,11 @@ const generateMainWindow = () => {
   let loginCount = 0;
   app.on('login', (event, webContents, request, authInfo, callback) => {
     try {
-      let workspace = fs.existsSync(workspacePath) ? JSON.parse(CryptoJS.AES.decrypt(fs.readFileSync(workspacePath, {encoding: 'utf-8'}), machineIdSync()).toString(CryptoJS.enc.Utf8)) : undefined;
+      const file = fs.readFileSync(workspacePath, {encoding: 'utf-8'});
+      const decriptedFile = CryptoJS.AES.decrypt(file, machineIdSync());
+      const fileExists = fs.existsSync(workspacePath);
+
+      let workspace = fileExists ? JSON.parse(decriptedFile).toString(CryptoJS.enc.Utf8) : undefined;
       if (workspace !== undefined && workspace.workspaces[0] !== undefined) {
         workspace = (workspace.workspaces[0] as Workspace);
 
@@ -194,6 +198,25 @@ const generateMainWindow = () => {
   }
 };
 
+// Used when people accidentally delete .aws directory when a workspace config is already defined
+// Note is a stupid error but people often do so. As there is already some security code with
+// this one we cover the full range of possibilities
+function fixDirectoriesAndFiles() {
+  try {
+    // .aws directory
+    fs.mkdirSync(os.homedir() + '/.aws');
+  } catch (err) {
+    log.warn('directory aws already exist');
+  } finally {
+    try {
+      // Write credential file
+      fs.writeFileSync(awsCredentialsPath, '');
+    } catch (err) {
+      log.warn('credential file couldn\'t be written');
+    }
+  }
+}
+
 // Prepare and generate the main window if everything is setupped correctly
 const initWorkspace = () => {
 
@@ -230,6 +253,7 @@ const initWorkspace = () => {
     setupWorkspace();
   } else {
     // Generate the main window
+    fixDirectoriesAndFiles();
     generateMainWindow();
   }
 };

@@ -119,6 +119,33 @@ button small {
   left: -7px;
 }
 
+button.small-btn {
+  display: block;
+  width: 100%;
+  min-width: auto!important;
+  height: 36px;
+  margin: 35px 0!important;
+  font-size: 14px!important;
+  padding: 5px!important;
+  color: white;
+}
+button.small-btn:hover {
+  color: #73E0CF;
+}
+
+button.xs-btn {
+  display: inline-block;
+  min-width: auto!important;
+  height: 36px;
+  width: 36px;
+  margin: 10px 0 0 8px!important;
+  font-size: 14px!important;
+  padding: 5px!important;
+}
+button.xs-btn:hover {
+  color: #73E0CF;
+}
+
 label { font-size: 12px; }
 
 hr { margin: 0 5px; }
@@ -199,4 +226,10 @@ body.moved .mask { display: block; opacity: 0; position: fixed; z-index: 1000; l
       }
     }
   }
+}
+
+ul li div.removed-sessions {
+  text-align: left!important;
+  overflow-x: hidden!important;
+  text-overflow: ellipsis!important;
 }

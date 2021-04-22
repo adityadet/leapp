@@ -6,13 +6,13 @@ import {ActivatedRoute, Router} from '@angular/router';
 import {CredentialsService} from '../../services/credentials.service';
 import {SessionService} from '../../services/session.service';
 import {Workspace} from '../../models/workspace';
-import {AwsAccount} from '../../models/aws-account';
 import {WorkspaceService} from '../../services/workspace.service';
 import {ProviderManagerService} from '../../services/provider-manager.service';
 import {AccountType} from '../../models/AccountType';
 import {Session} from '../../models/session';
 import {AntiMemLeak} from '../../core/anti-mem-leak';
 import {environment} from '../../../environments/environment';
+import * as uuid from 'uuid';
 
 @Component({
   selector: 'app-create-account',
@@ -35,6 +35,9 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
   @Input() selectedRole = '';
   @Input() fedUrl = '';
 
+  idps: { value: string, label: string}[] = [];
+  selectedIdpUrl: {value: string, label: string};
+
   federatedRoles: { name: string, roleArn: string }[] = [];
   federatedAccounts = [];
 
@@ -46,6 +49,9 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
   selectedRegion;
   locations = [];
   selectedLocation;
+
+  profiles: { value: string, label: string}[] = [];
+  selectedProfile: {value: string, label: string};
 
   eAccountType = AccountType;
 
@@ -67,6 +73,7 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
     accessKey: new FormControl('', [Validators.required]),
     awsRegion: new FormControl(''),
     mfaDevice: new FormControl(''),
+    awsProfile: new FormControl('', [Validators.required]),
     azureLocation: new FormControl('', [Validators.required])
   });
 
@@ -91,29 +98,47 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
       this.workspace = this.configurationService.getDefaultWorkspaceSync();
 
       const sessions = this.providerManagerService.getFederableAccounts();
-      sessions.forEach((session: Session) => {
-        let found = false;
-        this.accounts.forEach(acc => {
-          if (session.account.accountName === acc.accountName) {
-            found = true;
+      if (sessions && sessions.length > 0) {
+        sessions.forEach((session: Session) => {
+          let found = false;
+          this.accounts.forEach(acc => {
+            if (session.account.accountName === acc.accountName) {
+              found = true;
+            }
+          });
+          if (!found) {
+            this.accounts.push({
+              session,
+              accountName: session.account.accountName
+            });
           }
         });
-        if (!found) {
-          this.accounts.push({
-            session,
-            accountName: session.account.accountName
-          });
-        }
-      });
+      }
 
       // Add parameters to check what to do with form data
+      if (this.workspace.idpUrl && this.workspace.idpUrl.length > 0) {
+        this.workspace.idpUrl.forEach(idp => {
+          if (idp !== null) {
+            this.idps.push({value: idp.id, label: idp.url});
+          }
+        });
+      }
+
+      // Add parameters to check what to do with form data
+      if (this.workspace.profiles && this.workspace.profiles.length > 0) {
+        this.workspace.profiles.forEach(idp => {
+          if (idp !== null) {
+            this.profiles.push({value: idp.id, label: idp.name});
+          }
+        });
+      } else {
+        this.workspace.profiles = [{ id: uuid.v4(), name: 'default' }];
+        this.profiles.push({value: this.workspace.profiles[0].id, label: this.workspace.profiles[0].name});
+        this.configurationService.updateWorkspaceSync(this.workspace);
+      }
+
       this.hasOneGoodSession = (this.workspace.sessions && (this.workspace.sessions.length > 0));
       this.firstTime = params['firstTime'] || !this.hasOneGoodSession; // This way we also fix potential incongruence when you have half saved setup
-
-      this.fedUrl = this.workspace.idpUrl;
-
-      // TODO REDUNDANT
-      this.hasSsoUrl = this.fedUrl && this.fedUrl !== '';
 
       // Show the federated accounts
       // TODO: REDUNDANT
@@ -129,6 +154,7 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
 
       this.selectedRegion = this.workspace.defaultRegion || environment.defaultRegion || this.regions[0].region;
       this.selectedLocation = this.workspace.defaultLocation || environment.defaultLocation || this.locations[0].location;
+      this.selectedProfile = this.workspace.profiles.filter(p => p.name === 'default').map(p => ({ value: p.id, label: p.name }))[0];
     }));
   }
 
@@ -145,6 +171,14 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
     this.selectedRole = roleData.map(rd => rd.selectedrole)[0];
   }
 
+  addNewSSO(tag: string) {
+    return {value: uuid.v4(), label: tag};
+  }
+
+  addNewProfile(tag: string) {
+    return {value: uuid.v4(), label: tag};
+  }
+
   /**
    * Set the account number when the event is called
    * @param event - the event to call
@@ -158,6 +192,8 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
    */
   saveAccount() {
     this.appService.logger(`Saving account...`, LoggerLevel.INFO, this);
+    const selectedUrl = this.selectedIdpUrl ? {id: this.selectedIdpUrl.value, url: this.selectedIdpUrl.label } : undefined;
+    const selectedProfile = this.selectedProfile ? {id: this.selectedProfile.value, name: this.selectedProfile.label } : undefined;
 
     if (this.firstTime) {
       this.providerManagerService.saveFirstAccount(
@@ -166,6 +202,8 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
         this.selectedSession,
         this.selectedRole,
         this.selectedRegion,
+        selectedUrl,
+        selectedProfile,
         this.form
       );
     } else {
@@ -175,6 +213,8 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
         this.selectedSession,
         this.selectedRole,
         this.selectedRegion,
+        selectedUrl,
+        selectedProfile,
         this.form
       );
     }
@@ -210,7 +250,6 @@ export class CreateAccountComponent extends AntiMemLeak implements OnInit {
       this.accountType = undefined;
       this.provider = undefined;
       this.hasOneGoodSession = false;
-      this.hasSsoUrl = false;
       this.providerSelected = false;
       this.typeSelection = false;
       this.firstTime = true;

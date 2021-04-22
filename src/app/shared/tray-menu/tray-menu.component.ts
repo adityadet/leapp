@@ -31,7 +31,7 @@ export class TrayMenuComponent extends AntiMemLeak implements OnInit {
   }
 
   ngOnInit() {
-    this.subs.add(this.appService.redrawList.subscribe(res => {
+    this.subs.add(this.appService.redrawList.subscribe(() => {
       this.generateMenu();
     }));
     this.generateMenu();
@@ -48,15 +48,18 @@ export class TrayMenuComponent extends AntiMemLeak implements OnInit {
 
       let icon = '';
       let label = '';
+      const profile = this.configurationService.getDefaultWorkspaceSync().profiles.filter(p => p.id === session.profile)[0];
+      const iconValue = (profile && profile.name === 'default') ? 'home' : 'user';
+
       switch (session.account.type) {
         case AccountType.AWS_PLAIN_USER:
-          icon = (session.active && !session.loading) ? __dirname + `/assets/images/icon-online-aws.png` : __dirname + `/assets/images/icon-offline.png`;
+          icon = (session.active && !session.loading) ? __dirname + `/assets/images/${iconValue}-online.png` : __dirname + `/assets/images/${iconValue}-offline.png`;
           label = '  ' + session.account.accountName + ' - ' + (session.account as AwsPlainAccount).user;
           break;
         case AccountType.AWS:
         case AccountType.AWS_TRUSTER:
         case AccountType.AWS_SSO:
-          icon = (session.active && !session.loading) ? __dirname + `/assets/images/icon-online-aws.png` : __dirname + `/assets/images/icon-offline.png`;
+          icon = (session.active && !session.loading) ? __dirname + `/assets/images/${iconValue}-online.png` : __dirname + `/assets/images/${iconValue}-offline.png`;
           label = '  ' + session.account.accountName + ' - ' + (session.account as AwsAccount).role.name;
           break;
 
@@ -68,13 +71,13 @@ export class TrayMenuComponent extends AntiMemLeak implements OnInit {
         { label,
           type: 'normal',
           icon,
-          click: (menuItem, browserWindow, event) => {
+          click: () => {
             if (!session.active) {
               this.sessionService.startSession(session);
-              this.credentialService.refreshCredentials(session.account.type);
+              this.credentialService.refreshCredentials();
 
             } else {
-              this.credentialService.refreshCredentials(session.account.type);
+              this.credentialService.refreshCredentials();
               this.sessionService.stopSession(session);
             }
             this.appService.redrawList.emit(true);
@@ -85,10 +88,10 @@ export class TrayMenuComponent extends AntiMemLeak implements OnInit {
 
     const extraInfo = [
       { type: 'separator' },
-      { label: 'Show', type: 'normal', click: (menuItem, browserWindow, event) => { this.appService.getCurrentWindow().show(); } },
-      { label: 'About', type: 'normal', click: (menuItem, browserWindow, event) => { this.appService.getCurrentWindow().show(); this.appService.getDialog().showMessageBox({ icon: __dirname + `/assets/images/Leapp.png`, message: `Leapp.\n` + `Version ${version} (${version})\n` + 'Copyright 2019 beSharp srl.', buttons: ['Ok'] }); } },
+      { label: 'Show', type: 'normal', click: () => { this.appService.getCurrentWindow().show(); } },
+      { label: 'About', type: 'normal', click: () => { this.appService.getCurrentWindow().show(); this.appService.getDialog().showMessageBox({ icon: __dirname + `/assets/images/Leapp.png`, message: `Leapp.\n` + `Version ${version} (${version})\n` + 'Copyright 2019 beSharp srl.', buttons: ['Ok'] }); } },
       { type: 'separator' },
-      { label: 'Quit', type: 'normal', click: (menuItem, browserWindow, event) => { this.cleanBeforeExit(); } },
+      { label: 'Quit', type: 'normal', click: () => { this.cleanBeforeExit(); } },
     ];
 
     voices = voices.concat(extraInfo);
@@ -114,7 +117,7 @@ export class TrayMenuComponent extends AntiMemLeak implements OnInit {
       // Stop the session...
       this.sessionService.stopAllSession();
       // Stop credentials to be used
-      this.credentialService.refreshCredentials(null);
+      this.credentialService.refreshCredentials();
       // Clean the config file
       this.appService.cleanCredentialFile();
     } catch (err) {

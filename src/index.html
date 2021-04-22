@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     font-src 'self' data: https://fonts.gstatic.com data: https://ka-p.fontawesome.com;
-    script-src 'self' 'unsafe-inline' data: https://kit.fontawesome.com/c02fc34a37.js;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' data: https://kit.fontawesome.com/c02fc34a37.js;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     connect-src *;
   ">
@@ -21,7 +21,7 @@
 <script>
   window.native = {
     log: require('electron-log'),
-    fs: require('fs'),
+    fs: require('fs-extra'),
     rimraf: require('rimraf'),
     os: require('os'),
     ini: require('ini'),

@@ -8,6 +8,11 @@ import {Router} from '@angular/router';
 import {AntiMemLeak} from '../../core/anti-mem-leak';
 import {constants} from '../../core/enums/constants';
 import {environment} from '../../../environments/environment';
+import * as uuid from 'uuid';
+import {AwsAccount} from '../../models/aws-account';
+import {SessionService} from '../../services/session.service';
+import {IdpResponseType, WorkspaceService} from '../../services/workspace.service';
+import {AwsPlainAccount} from '../../models/aws-plain-account';
 
 @Component({
   selector: 'app-profile-page',
@@ -16,7 +21,12 @@ import {environment} from '../../../environments/environment';
 })
 export class ProfilePageComponent extends AntiMemLeak implements OnInit {
 
+  activeTab = 1;
+
+  awsProfileValue: { id: string, name: string };
   idpUrlValue;
+  editingIdpUrl: boolean;
+  editingAwsProfile: boolean;
 
   showProxyAuthentication = false;
   proxyProtocol = 'https'; // Default
@@ -34,6 +44,7 @@ export class ProfilePageComponent extends AntiMemLeak implements OnInit {
 
   public form = new FormGroup({
     idpUrl: new FormControl(''),
+    awsProfile: new FormControl(''),
     proxyUrl: new FormControl(''),
     proxyProtocol: new FormControl(''),
     proxyPort: new FormControl(''),
@@ -45,20 +56,24 @@ export class ProfilePageComponent extends AntiMemLeak implements OnInit {
   });
 
   /* Simple profile page: shows the Idp Url and the workspace json */
-
-
   constructor(
     private configurationService: ConfigurationService,
     private appService: AppService,
     private fileService: FileService,
+    private sessionService: SessionService,
+    private workspaceService: WorkspaceService,
     private router: Router
   ) { super(); }
 
   ngOnInit() {
     this.workspaceData = this.configurationService.getDefaultWorkspaceSync();
+    if (this.workspaceData === undefined || this.workspaceData.proxyConfiguration === undefined) {
+      this.workspaceService.createNewWorkspace(undefined, undefined, {id: uuid.v4(), name: 'default'}, 'default', IdpResponseType.SAML);
+      this.workspaceData = this.configurationService.getDefaultWorkspaceSync();
+    }
     if (this.workspaceData.name && this.workspaceData.name !== '') {
 
-      this.idpUrlValue = this.workspaceData.idpUrl;
+      this.idpUrlValue = '';
       this.proxyProtocol = this.workspaceData.proxyConfiguration.proxyProtocol;
       this.proxyUrl = this.workspaceData.proxyConfiguration.proxyUrl;
       this.proxyPort = this.workspaceData.proxyConfiguration.proxyPort;
@@ -94,8 +109,6 @@ export class ProfilePageComponent extends AntiMemLeak implements OnInit {
    */
   saveOptions() {
     if (this.form.valid) {
-      this.workspaceData.idpUrl = this.form.value.idpUrl;
-
       this.workspaceData.proxyConfiguration.proxyUrl = this.form.controls['proxyUrl'].value;
       this.workspaceData.proxyConfiguration.proxyProtocol = this.form.controls['proxyProtocol'].value;
       this.workspaceData.proxyConfiguration.proxyPort = this.form.controls['proxyPort'].value;
@@ -143,4 +156,108 @@ export class ProfilePageComponent extends AntiMemLeak implements OnInit {
     this.router.navigate(['/', 'sessions', 'session-selected']);
   }
 
+  manageIdpUrl(id) {
+    const idpUrl = this.workspaceData.idpUrl.findIndex(u => u.id === id);
+    if (this.form.get('idpUrl').value !== '') {
+      if (idpUrl === -1) {
+        this.workspaceData.idpUrl.push({ id: uuid.v4(), url: this.form.get('idpUrl').value });
+      } else {
+        this.workspaceData.idpUrl[idpUrl].url = this.form.get('idpUrl').value;
+      }
+      this.configurationService.updateWorkspaceSync(this.workspaceData);
+    }
+    this.editingIdpUrl = false;
+    this.idpUrlValue = undefined;
+    this.form.get('idpUrl').setValue('');
+  }
+
+  editIdpUrl(id) {
+    const idpUrl = this.workspaceData.idpUrl.filter(u => u.id === id)[0];
+    this.idpUrlValue = idpUrl;
+    this.form.get('idpUrl').setValue(idpUrl.url);
+    this.editingIdpUrl = true;
+  }
+
+  deleteIdpUrl(id) {
+    // Federated
+    const federated = this.workspaceData.sessions.filter(s => (s.account as AwsAccount).idpUrl !== undefined && (s.account as AwsAccount).idpUrl === id);
+    let sessions = federated;
+
+    // Add trusters from federated
+    federated.forEach(fed => {
+      const childs = this.sessionService.childSessions(fed);
+      sessions = sessions.concat(childs);
+    });
+
+    // Get only names for display
+    let sessionsNames = sessions.map(s => {
+      return `<li><div class="removed-sessions"><b>${s.account.accountName}</b> - <small>${(s.account as AwsAccount).role.name}</small></div></li>`;
+    });
+    if (sessionsNames.length === 0) {
+      sessionsNames = ['<li><b>no sessions</b></li>'];
+    }
+
+    // Ask for deletion
+    this.appService.confirmDialog(`Deleting this Idp url will also remove these sessions: <br><ul>${sessionsNames.join('')}</ul>Do you want to proceed?`, (res) => {
+      if (res !== constants.CONFIRM_CLOSED) {
+        this.appService.logger(`Removing idp url with id: ${id}`, LoggerLevel.INFO, this);
+        const idpUrl = this.workspaceData.idpUrl.findIndex(u => u.id === id);
+        this.workspaceData.idpUrl.splice(idpUrl, 1);
+        this.configurationService.updateWorkspaceSync(this.workspaceData);
+        sessions.forEach(s => {
+          this.sessionService.removeSession(s);
+        });
+      }
+    });
+  }
+
+  manageAwsProfile(id: string | number) {
+    const profileIndex = this.workspaceData.profiles.findIndex(p => p.id === id);
+    if (this.form.get('awsProfile').value !== '') {
+      if (profileIndex === -1) {
+        this.workspaceData.profiles.push({ id: uuid.v4(), name: this.form.get('awsProfile').value });
+      } else {
+        this.workspaceData.profiles[profileIndex].name = this.form.get('awsProfile').value;
+      }
+      this.configurationService.updateWorkspaceSync(this.workspaceData);
+    }
+    this.editingAwsProfile = false;
+    this.awsProfileValue = undefined;
+    this.form.get('awsProfile').setValue('');
+  }
+
+  editAwsProfile(id: string) {
+    const profile = this.workspaceData.profiles.filter(u => u.id === id)[0];
+    this.awsProfileValue = profile;
+    this.form.get('awsProfile').setValue(profile.name);
+    this.editingAwsProfile = true;
+  }
+
+  deleteAwsProfile(id: string) {
+    // Default profile id
+    const defaultId = this.workspaceData.profiles.filter(p => p.name === 'default')[0].id;
+
+    // Federated
+    const sessions = this.workspaceData.sessions.filter(s => s.profile === id);
+
+    // Get only names for display
+    let sessionsNames = sessions.map(s => {
+      return `<li><div class="removed-sessions"><b>${s.account.accountName}</b> - <small>
+              ${(s.account as AwsAccount).role ? (s.account as AwsAccount).role.name : (s.account as AwsPlainAccount).user}</small></div></li>`;
+    });
+    if (sessionsNames.length === 0) {
+      sessionsNames = ['<li><b>no sessions</b></li>'];
+    }
+
+    // Ask for deletion
+    this.appService.confirmDialog(`Deleting this profile will set default to these sessions: <br><ul>${sessionsNames.join('')}</ul>Do you want to proceed?`, (res) => {
+      if (res !== constants.CONFIRM_CLOSED) {
+        this.appService.logger(`Reverting to default profile with id: ${id}`, LoggerLevel.INFO, this);
+        const profileToDelete = this.workspaceData.profiles.findIndex(p => p.id === id);
+        this.workspaceData.profiles.splice(profileToDelete, 1);
+        this.configurationService.updateWorkspaceSync(this.workspaceData);
+        this.sessionService.replaceAllProfileId(id, defaultId);
+      }
+    });
+  }
 }
